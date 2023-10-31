@@ -55,7 +55,7 @@ type Redeemer struct {
 	AddressToken             string
 	PaymentMethod            string
 	CardId                   string
-	Promo                    string
+	PromotionID		 string
 	StripePaymentId          string
 	StripeIntentId           string
 	DispatchedStripeIntentId string
@@ -160,6 +160,75 @@ func (c *Redeemer) fingerprintncookies() error {
 		return errors.New("failed to get cookies and fingerprint")
 	}
 }
+
+func (c *Redeemer) convertPromoLink() error {
+
+	linkParts := strings.Split(s.Promo, "/")
+    	jwt := linkParts[len(linkParts)-1]
+    	promotionid := linkParts[len(linkParts)-2]
+	
+	req := fasthttp.AcquireRequest()
+	req.SetRequestURIBytes([]byte("https://discord.com/api/v9/entitlements/partner-promotions/%s", promotionid))
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.Header.Set(`Accept`, `*/*`)
+	req.Header.Set(`Accept-Encoding`, `br`)
+	req.Header.Set(`Accept-Language`, `en-GB,en-US;q=0.9,en;q=0.8`)
+	req.Header.Set(`Authorization`, c.Token)
+	req.Header.Set(`Content-Type`, `application/json`)
+	req.Header.Set(`Cookie`, c.Cookies)
+	req.Header.Set(`Origin`, `https://discord.com`)
+	req.Header.Set(`Referer`, `https://discord.com`)
+	req.Header.Set(`Sec-Ch-Ua`, `Not/A)Brand";v="99", "Google Chrome";v="115", "Chromium";v="115`)
+	req.Header.Set(`Sec-Ch-Ua-Mobile`, `?1`)
+	req.Header.Set(`Sec-Ch-Ua-Platform`, `"Windows"`)
+	req.Header.Set(`Sec-Fetch-Dest`, `empty`)
+	req.Header.Set(`Sec-Fetch-Mode`, `cors`)
+	req.Header.Set(`sec-fetch-site`, `same-origin`)
+	req.Header.Set(`User-Agent`, c.Useragent)
+	req.Header.Set(`X-Debug-Options`, `bugReporterEnabled`)
+	req.Header.Set(`X-Discord-Locale`, `en-US`)
+	req.Header.Set(`X-Discord-Timezone`, `Asia/Calcutta`)
+	req.Header.Set(`x-context-properties`, `eyJsb2NhdGlvbiI6Ii9jaGFubmVscy9AbWUifQ==`)
+	req.Header.Set(`X-Super-Properties`, c.Superproperties)
+	req.Header.Set(`fingerprint`, c.Fingerprint)
+
+    	data := map[string]string{"jwt": jwt}
+    	jsonData, err := json.Marshal(data)
+    	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return
+    	}
+	
+	req.SetBody(jsonData)
+	
+	resp := fasthttp.AcquireResponse()
+	for {
+		printProgress("[+] Converting Promo Code...")
+		err := c.Client.Do(req, resp)
+		if err != nil {
+			printNetworkError(0, "SetupIntents", err.Error())
+			printProgress("Retrying...")
+			continue
+		}
+		break
+	}
+	if resp.StatusCode() == 200 {
+		body, err := resp.BodyUnbrotli()
+		if err != nil {
+			return err
+		}
+		var acc struct {
+		Code    string `json:"code"`
+		}
+		c.Promo := Code
+	} else {
+		printNetworkError(resp.StatusCode(), fmt.Sprintf("CSetupintents -> xxxxxx%s", c.Vccnum[6:]), string(resp.Body()))
+		failedvcc <- fmt.Sprintf("%s:%s%s:%s", c.Vccnum, c.Expmonth, c.Expyear, c.Vcccvv)
+		return errors.New("something went wrong on csetupintent")
+	}
+}
+
+
 func (c *Redeemer) checktoken() error {
 	req := fasthttp.AcquireRequest()
 	req.SetRequestURIBytes([]byte(`https://discord.com/api/v9/users/@me`))
@@ -1025,6 +1094,8 @@ func main() {
 				client.Promo = strings.Split(promo, "s/")[1]
 			} else if strings.Contains(promo, "https://promos.discord.gg/") {
 				client.Promo = strings.Split(promo, "g/")[1]
+			} else if strings.Contains(promo, "https://discord.com/billing/partner-promotions/"){
+				client.Promo = strings.Split(promo, "s/")[1]
 			} else {
 				printError(0, "PROMO FORMAT INVALID", "invalid promotion link format")
 			}
