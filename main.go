@@ -55,7 +55,7 @@ type Redeemer struct {
 	AddressToken             string
 	PaymentMethod            string
 	CardId                   string
-	PromotionID		 string
+	Promo			 string
 	StripePaymentId          string
 	StripeIntentId           string
 	DispatchedStripeIntentId string
